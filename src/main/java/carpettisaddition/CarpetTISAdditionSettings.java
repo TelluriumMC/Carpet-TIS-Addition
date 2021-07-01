@@ -4,10 +4,6 @@ import carpet.settings.ParsedRule;
 import carpet.settings.Rule;
 import carpet.settings.Validator;
 import carpet.utils.Messenger;
-import carpettisaddition.helpers.rule.synchronizedLightThread.LightThreadSynchronizer;
-import carpettisaddition.logging.loggers.microtiming.enums.MicroTimingTarget;
-import carpettisaddition.logging.loggers.microtiming.enums.TickDivision;
-import carpettisaddition.logging.loggers.microtiming.marker.MicroTimingMarkerManager;
 import net.minecraft.server.command.ServerCommandSource;
 
 import java.util.regex.Pattern;
@@ -232,156 +228,6 @@ public class CarpetTISAdditionSettings
 	)
 	public static boolean keepMobInLazyChunks = false;
 
-//	Remove due to fabric carpet implement this in 1.4.23
-//	public static int lightEngineMaxBatchSize = 5;
-
-	@Rule(
-			desc = "The sampling duration of light queue logger in game tick",
-			extra = {
-					"Affects all data except the queue size displayed in the logger"
-			},
-			validate = ValidatePositive.class,
-			options = {"1", "20", "60", "100", "6000"},
-			strict = false,
-			category = {TIS}
-	)
-	public static int lightQueueLoggerSamplingDuration = 60;
-
-	@Rule(
-			desc = "Pause or disable light updates",
-			extra = {
-					"If set to suppressed, no light update can be executed which simulates light suppressor",
-					"If set to ignored, no light update can be scheduled. It's useful for creating light errors",
-					"If set to off, no light update can be scheduled or executed",
-					"[WARNING] If set to suppressed or off, new chunks cannot be loaded. Then if the server tries to load chunk for player movement or whatever reason the server will be stuck forever"
-			},
-			category = {TIS, CREATIVE, EXPERIMENTAL},
-			validate = ValidateLightUpdates.class
-	)
-	public static LightUpdateOptions lightUpdates = LightUpdateOptions.ON;
-
-	private static class ValidateLightUpdates extends Validator<Enum<LightUpdateOptions>>
-	{
-		@Override
-		public Enum<LightUpdateOptions> validate(ServerCommandSource source, ParsedRule<Enum<LightUpdateOptions>> currentRule, Enum<LightUpdateOptions> newValue, String string)
-		{
-			return LightThreadSynchronizer.checkRuleSafety(source, synchronizedLightThread, (LightUpdateOptions)newValue) ? newValue : null;
-		}
-	}
-
-	public enum LightUpdateOptions
-	{
-		// Regular vanilla behavior
-		ON(true, true),
-		// Enqueue tasks, but never execute them. Might blocks the game forever
-		SUPPRESSED(true, false),
-		// Ignore all incoming tasks except ones created in method light, but already enqueued ones can be executed
-		// TODO: Further testing to make sure it doesnt block the server
-		IGNORED(false, true),
-		// Ignore all incoming tasks and do not execute any tasks. Might blocks the game forever
-		OFF(false, false);
-
-		private final boolean shouldEnqueue;
-		private final boolean shouldExecute;
-
-		LightUpdateOptions(boolean shouldEnqueue, boolean shouldExecute)
-		{
-			this.shouldEnqueue = shouldEnqueue;
-			this.shouldExecute = shouldExecute;
-		}
-
-		/**
-		 * ON, SUPPRESSED: true
-		 * OFF, IGNORE: false
-		 */
-		public boolean shouldEnqueueLightTask()
-		{
-			return this.shouldEnqueue;
-		}
-
-		/**
-		 * ON, IGNORE: true
-		 * OFF, SUPPRESSED: false
-		 */
-		public boolean shouldExecuteLightTask()
-		{
-			return this.shouldExecute;
-		}
-	}
-
-	@Rule(
-			desc = "Enable the function of MicroTick logger",
-			extra = {
-					"Display redstone components actions, block updates and stacktrace with a wool block",
-					"Use /log microTiming to start logging",
-					"Might impact the server performance when it's on",
-					"EndRods will detect block updates and redstone components will show their actions",
-					"- Observer, Piston, EndRod: pointing towards wool",
-					"- Repeater, Comparator, Rail, Button, etc.: placed on wool",
-					"Beside that, a universal block actions logging method is using EndRod on wool block to point on the block you want to log",
-					"Check rule microTimingTarget to see how to switch logging method"
-			},
-			category = {TIS, CREATIVE}
-	)
-	public static boolean microTiming = false;
-
-	@Rule(
-			desc = "Allow player to right click with dye item to mark a block to be logged by microTiming logger",
-			extra = {
-					"You need to subscribe to microTiming logger for marking or displaying blocks",
-					"Right click with the same dye to switch the marker to end rod mode with which block update information will be logged additionally. Right click again to remove the marker",
-					"Right click a marker with slime ball item to make it movable. It will move to the corresponding new position when the attaching block is moved by a piston",
-					"Use `/carpet microTimingDyeMarker clear` to remove all markers",
-					"You can create a named marker by using a renamed dye item. Marker name will be shown in logging message as well",
-					"You can see boxes at marked blocks with fabric-carpet installed on your client. " +
-							"With carpet-tis-addition installed the marker name could also be seen through blocks",
-			},
-			options = {"false", "true", "clear"},
-			validate = ValidateMicroTimingDyeMarker.class,
-			category = {TIS, CREATIVE}
-	)
-	public static String microTimingDyeMarker = "false";
-
-	private static class ValidateMicroTimingDyeMarker extends Validator<String>
-	{
-		@Override
-		public String validate(ServerCommandSource source, ParsedRule<String> currentRule, String newValue, String string)
-		{
-			if ("clear".equals(newValue))
-			{
-				MicroTimingMarkerManager.getInstance().clear();
-				if (source != null)
-				{
-					Messenger.m(source, "w " + MicroTimingMarkerManager.getInstance().tr("cleared", "Marker cleared"));
-				}
-				return currentRule.get();
-			}
-			return newValue;
-		}
-	}
-
-	@Rule(
-			desc = "Modify the way to specify events to be logged in microTiming logger",
-			extra = {
-					"labelled: Logs events labelled with wool",
-					"in_range: Logs events within 32m of any player",
-					"all: Logs every event. Use with caution",
-					"marker_only: Logs event labelled with dye marker only. Use it with rule microTimingDyeMarker"
-			},
-			category = {TIS, CREATIVE}
-	)
-	public static MicroTimingTarget microTimingTarget = MicroTimingTarget.LABELLED;
-
-	@Rule(
-			desc = "Determine the way to divide game ticks",
-			extra = {
-					"world_timer: Divides at Overworld timer increment",
-					"player_action: Divides at the beginning of player action"
-			},
-			category = {TIS, CREATIVE}
-	)
-	public static TickDivision microTimingTickDivision = TickDivision.WORLD_TIMER;
-
 	@Rule(
 			desc = "Disable some command to prevent accidentally cheating",
 			extra = "Affects command list: /gamemode, /tp, /teleport, /give, /setblock, /summon",
@@ -490,33 +336,6 @@ public class CarpetTISAdditionSettings
 			category = {TIS, BUGFIX}
 	)
 	public static boolean sandDupingFix = false;
-
-//	Remove due to fabric carpet implement this in 1.4.25
-//	public static int structureBlockLimit = 32;
-
-//	Remove due to fabric carpet implement this in 1.4.25
-//	public static double structureBlockOutlineDistance = 96.0D;
-
-	@Rule(
-			desc = "Synchronize lighting thread with the server thread",
-			extra = {
-					"so the light thread will not lag behind the main thread and get desynchronized",
-					"The server will wait until all lighting tasks to be done at the beginning of each world ticking",
-					"With this rule you can safely /tick warp without potential light suppression or lighting desynchronization"
-			},
-			category = {TIS, CREATIVE, EXPERIMENTAL},
-			validate = ValidateSynchronizedLightThread.class
-	)
-	public static boolean synchronizedLightThread = false;
-
-	private static class ValidateSynchronizedLightThread extends Validator<Boolean>
-	{
-		@Override
-		public Boolean validate(ServerCommandSource source, ParsedRule<Boolean> currentRule, Boolean newValue, String string)
-		{
-			return LightThreadSynchronizer.checkRuleSafety(source, newValue, lightUpdates) ? newValue : null;
-		}
-	}
 
 	@Rule(
 			desc = "Modify the limit of executed tile tick events per game tick",

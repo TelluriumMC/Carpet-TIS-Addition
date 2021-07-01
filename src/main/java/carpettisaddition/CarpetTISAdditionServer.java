@@ -4,17 +4,6 @@ import carpet.CarpetExtension;
 import carpet.CarpetServer;
 import carpet.script.CarpetExpression;
 import carpet.script.annotation.AnnotationParser;
-import carpettisaddition.commands.lifetime.LifeTimeCommand;
-import carpettisaddition.commands.lifetime.LifeTimeTracker;
-import carpettisaddition.commands.raid.RaidCommand;
-import carpettisaddition.commands.raid.RaidTracker;
-import carpettisaddition.logging.TISAdditionLoggerRegistry;
-import carpettisaddition.logging.loggers.lightqueue.LightQueueHUDLogger;
-import carpettisaddition.logging.loggers.microtiming.MicroTimingLoggerManager;
-import carpettisaddition.logging.loggers.microtiming.marker.MicroTimingMarkerManager;
-import carpettisaddition.logging.loggers.microtiming.utils.MicroTimingStandardCarpetLogger;
-import carpettisaddition.script.Functions;
-import carpettisaddition.script.MicroTimingEvent;
 import carpettisaddition.translations.TISAdditionTranslations;
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.server.MinecraftServer;
@@ -53,9 +42,6 @@ public class CarpetTISAdditionServer implements CarpetExtension
     public void onGameStarted()
     {
         CarpetServer.settingsManager.parseSettingsClass(CarpetTISAdditionSettings.class);
-
-        AnnotationParser.parseFunctionClass(Functions.class);
-        MicroTimingEvent.noop();  //to register event properly
     }
 
     @Override
@@ -70,43 +56,29 @@ public class CarpetTISAdditionServer implements CarpetExtension
      */
     public void onServerLoadedWorldsCTA(MinecraftServer server)
     {
-        MicroTimingLoggerManager.attachServer(server);
-        LifeTimeTracker.attachServer(server);
-        LightQueueHUDLogger.getInstance().attachServer(server);
-        MicroTimingMarkerManager.getInstance().clear();
+
     }
 
     @Override
     public void onServerClosed(MinecraftServer server)
     {
-        RaidTracker.getInstance().stop();
-        MicroTimingLoggerManager.detachServer();
-        LifeTimeTracker.detachServer();
+
     }
 
     @Override
     public void onTick(MinecraftServer server)
     {
-        LightQueueHUDLogger.getInstance().tick();
-        MicroTimingMarkerManager.getInstance().tick();
+
     }
 
     public static void onCarpetClientHello(ServerPlayerEntity player)
     {
-        MicroTimingStandardCarpetLogger.getInstance().onCarpetClientHello(player);
+
     }
 
     @Override
     public void registerCommands(CommandDispatcher<ServerCommandSource> dispatcher)
     {
-        RaidCommand.getInstance().registerCommand(dispatcher);
-        LifeTimeCommand.getInstance().registerCommand(dispatcher);
-    }
-
-    @Override
-    public void registerLoggers()
-    {
-        TISAdditionLoggerRegistry.registerLoggers();
     }
 
     @Override
